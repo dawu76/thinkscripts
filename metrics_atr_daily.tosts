@@ -1,0 +1,38 @@
+
+# ATR Daily Range
+# tomsk
+# 12.17.2019
+# source: https://usethinkscript.com/threads/dtr-vs-atr-indicator-for-thinkorswim.387/
+
+# V1.0 - 12.16.2019 - tomsk   - Initial release ATR Daily Range
+# V1.1 - 12.16.2019 - tomsk   - Added performance relative to ATR range
+# V1.2 - 12.17.2019 - tomsk   - Added plot lines for ATR High/Low on the chart
+
+# Displays ATR High/Low thresholds relative to daily open
+
+input length = 14;
+input averageType = AverageType.WILDERS;
+
+def o = open(period = AggregationPeriod.DAY);
+def h = high(period = AggregationPeriod.DAY);
+def l = low(period = AggregationPeriod.DAY);
+def c = close(period = AggregationPeriod.DAY);
+def R = (c - l) / (h - l);
+def ATRD = MovingAverage(averageType, TrueRange(h, c, l), length);
+def ATRH = o + ATRD;
+def ATRL = o - ATRD;
+
+AddLabel(1, "ATR Daily High/Low Level = [ " + Round(ATRH,2) + " / " + Round(ATRL,2) + " ]", Color.PINK);
+AddLabel(1, "Current Close = " + close + " [ " + AsPercent(R) + " ]", Color.YELLOW);
+
+def LBN = if isNaN(close[-1]) and !isNaN(close) then barnumber() else Double.NaN;
+plot ATR_High = if barNumber() >= highestAll(LBN)
+                then highestAll(if isNaN(close[-1]) then ATRH else Double.NaN)
+                else Double.NaN;
+ATR_High.SetLineWeight(2);
+ATR_High.SetDefaultColor(Color.Cyan);
+
+plot ATR_Low = if barNumber() >= highestAll(LBN)
+               then highestAll(if isNaN(close[-1]) then ATRL else Double.NaN) else Double.NaN;
+ATR_Low.SetLineWeight(2);
+ATR_Low.SetDefaultColor(Color.Yellow);
