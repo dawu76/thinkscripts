@@ -22,8 +22,15 @@ def ATRD = MovingAverage(averageType, TrueRange(h, c, l), length);
 def ATRH = o + ATRD;
 def ATRL = o - ATRD;
 
-AddLabel(1, "Expected high/low based on ATR: [ " + Round(ATRH,2) + " / " + Round(ATRL,2) + " ]", Color.PINK);
-AddLabel(1, "High: " + h + " low: " + l + " close: " + c + " [ " + AsPercent(R) + " ]", Color.GREEN);
+AddLabel(1, "Expected high/low based on ATR: " +
+            "[ " + Round(ATRH,2) + " / " + Round(ATRL,2) + " ]",
+            Color.PINK);
+
+AddLabel(1, "High: " + Round(h,2) + 
+            " low: " + Round(l,2) +
+            " close: " + Round(c,2) +
+            " [ " + AsPercent(R) + " ]",
+            Color.GREEN);
 
 def LBN = if isNaN(c[-1]) and !isNaN(c) then barnumber() else Double.NaN;
 
