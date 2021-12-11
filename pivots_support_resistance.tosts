@@ -1,0 +1,155 @@
+# ProjectionPivots_v03_JQ
+# 03.04.2019
+# Original Code and Concept by Mobius:
+# V01.08.2012 Projection Pivots
+
+# Notes:
+# 03.04.2019 added linits on extensions
+# 03.05.2019 adjusted limits on extensions by adding user input upper and lower extenion percent limits
+
+input n = 21;
+input showLines = yes;
+input showValues = no;
+input showBarNumbers = no;
+input ExtensionLengthBars = 20; # added to control length of Entension
+input UpperExtensionPercentLimit = 5;
+input LowerExtensionPercentLimit = 5;
+input DisplayLabel = yes;
+addlabel (DisplayLabel, "Projection Pivots n:" + n + " " , color.WHITE);
+
+# define variables to reduce data calls to TOS iData server
+def vHigh = high;
+def vLow = low;
+def vOpen = open;
+def vClose = close;
+def vVolume = volume;
+def nan = Double.NaN;
+def bn = BarNumber();
+def currentBar = HighestAll(if !IsNaN(vHigh) then bn else nan);
+
+# Bubble Locations
+def x_AxisLastExpansionBar = BarNumber() == HighestAll(BarNumber());  #corrected 11.12.2018 (JQ)
+# syntax: addChartBubble(x_AxisLastExpansionBar, y-axis coordinate," text", Color.LIME); #verified 12.25.2018 (JQ)
+
+def PH;
+def PL;
+
+# get highest high over the *next* (n+1) values?
+def hh = fold i = 1 to n + 1
+         with p = 1
+         while p do vHigh > getValue(vHigh, -i);
+
+# get lowest low over the *next* (n+1) values?
+def ll = fold j = 1 to n + 1
+         with q = 1
+         while q do vLow < getValue(low, -j);
+
+# if current high is the highest among last `n` bars and highest high over next (n+1) values is available
+PH = if (bn > n and vHigh == highest(vHigh, n) and hh) then vHigh else double.NaN;
+# if current low is the lowest among last `n` bars and lowest low over next (n+1) values is available
+PL = if (bn > n and vLow == lowest(vLow, n) and ll) then vLow else double.NaN;
+
+def PHBar = if !isNaN(PH) then bn else PHBar[1];
+def PLBar = if !isNaN(PL) then bn else PLBar[1];
+
+# define modified versions of `PH` and `PL` with non-missing values carried forward
+# use `PH` if available, otherwise use prior value of `PHL`
+def PHL = if !isNaN(PH) then PH else PHL[1];
+# use `PL` if available, otherwise use prior value of `PLL`
+def PLL = if !isNaN(PL) then PL else PLL[1];
+
+# if `PHL` has changed, use prior `PHBar`, otherwise use `priorPHBar`
+def priorPHBar = if PHL != PHL[1] then PHBar[1] else priorPHBar[1];
+
+def priorPLBar = if PLL != PLL[1] then PLBar[1] else priorPLBar[1];
+def HighPivots = bn >= highestAll(priorPHBar);
+def LowPivots = bn >= highestAll(priorPLBar);
+def FirstRpoint = if HighPivots then bn - PHBar else 0;
+
+def PriorRpoint = if HighPivots
+                 then bn - PriorPHBar
+                 else 0;
+
+def RSlope = (getvalue(PH, FirstRpoint) - getvalue(PH, PriorRpoint))
+                   / (PHBar - PriorPHBar);
+
+def FirstSpoint = if LowPivots then bn - PLBar else 0;
+def PriorSpoint = if LowPivots then bn - PriorPLBar else 0;
+
+def SSlope = (getvalue(PL, FirstSpoint) - getvalue(PL, PriorSpoint))
+             / (PLBar - PriorPLBar);
+
+# equals 1 if current bar number is the most recent pivot high or low
+def RExtend = if bn == highestall(PHBar) then 1 else RExtend[1];
+def SExtend = if bn == highestall(PLBar) then 1 else SExtend[1];
+
+plot pivotHigh = if HighPivots then PH else double.NaN;
+pivotHigh.SetDefaultColor(GetColor(1));
+pivotHigh.setPaintingStrategy(PaintingStrategy.VALUES_ABOVE);
+pivotHigh.setHiding(!showValues);
+
+plot pivotHighLine = if PHL > 0 and HighPivots then PHL else double.NaN;
+pivotHighLine.SetPaintingStrategy(PaintingStrategy.DASHES);  # Mobius original was DASHES
+pivotHighLine.setDefaultColor(color.uptick);    #JQ 7.8.2018 added
+pivotHighLine.setHiding(!showLines);
+
+plot RLine = pivotHigh;
+RLine.enableApproximation(); # connects adjacent non-NaN values
+RLine.SetDefaultColor(Color.LIGHT_GRAY);
+RLine.SetStyle(Curve.Short_DASH);
+
+# Added code to limit resistance estension line (JQ 03.04.2019)
+def calc_ResistanceExtension = if RExtend then (bn - PHBar) * RSlope + PHL
+                               else double.NaN;
+
+plot line_ResistanceExtension = if bn <= (Currentbar + ExtensionLengthBars)
+                                and calc_ResistanceExtension[1] >=  (lowestall(vLow) * (1-(lowerExtensionPercentLimit/100)))
+                                and calc_ResistanceExtension[1] <= (Highestall(vHigh) * (1 + (upperExtensionPercentLimit/100)))
+                                then calc_ResistanceExtension else double.nan;
+line_ResistanceExtension.SetStyle(Curve.Short_DASH);
+line_ResistanceExtension.SetDefaultColor(color.LIGHT_GRAY); #was 7
+line_ResistanceExtension.setLineWeight(1);
+
+# Low Plots
+# `LowPivots` := bar numbers since prior pivot low
+plot pivotLow = if LowPivots then PL else double.NaN;
+pivotLow.setDefaultColor(GetColor(4));
+pivotLow.setPaintingStrategy(PaintingStrategy.VALUES_BELOW);
+pivotLow.setHiding(!showValues);
+
+plot pivotLowLine = if PLL > 0 and LowPivots then PLL else double.NaN;
+pivotLowLine.SetPaintingStrategy(PaintingStrategy.DASHES);
+pivotLowLine.setDefaultColor(color.DOWNTICK);
+pivotLowLine.setHiding(!showLines);
+
+plot support_line = pivotLow;
+support_line.enableApproximation(); # connects adjacent non-NaN values
+support_line.SetDefaultColor(color.LIGHT_GRAY);
+support_line.SetStyle(Curve.Short_DASH);
+
+# limit support extension line (JQ 03.04.2019)
+def support_extension_values = if SExtend then (bn - PLBar) * SSlope + PLL
+                               else double.NaN;
+
+# draw support extension line up to `ExtensionLengthBars` bars beyond `CurrentBar` when
+# prior bar's support extension is within certain bounds of lowest low or highest high
+plot support_extension_line = if bn <= (CurrentBar + ExtensionLengthBars)
+                                 and support_extension_values[1] >= (LowestAll(vLow) * (1-(lowerExtensionPercentLimit/100)))
+                                 and support_extension_values[1] <= (HighestAll(vHigh) * (1 + (upperExtensionPercentLimit/100)))
+                                 then support_extension_values
+                              else double.nan;
+support_extension_line.SetDefaultColor(color.LIGHT_GRAY);
+support_extension_line.SetStyle(Curve.Short_DASH);
+support_extension_line.setLineWeight(1);
+
+plot BarNumbersBelow = bn;
+BarNumbersBelow.SetDefaultColor(GetColor(0));
+BarNumbersBelow.setHiding(!showBarNumbers);
+BarNumbersBelow.SetPaintingStrategy(PaintingStrategy.VALUES_BELOW);
+
+plot PivotDot = if !isNaN(pivotHigh) then pivotHigh
+                else if !isNaN(pivotLow) then pivotLow
+                else double.NaN;
+pivotDot.SetDefaultColor(GetColor(7));
+pivotDot.SetPaintingStrategy(PaintingStrategy.POINTS);
+pivotDot.SetLineWeight(3);
