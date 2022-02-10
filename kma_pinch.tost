@@ -1,0 +1,47 @@
+#get user inputs, however, set basics for proper KMAP
+
+input KMAP_Percent = 2;
+input Price_Offset = 3.0;
+
+def userKMAP = KMAP_Percent/100;
+def userPriceO = Price_Offset/100;
+
+def sma10 = Average(close, 10);
+def sma21 = Average(close, 21);
+def sma50 = Average(close, 50);
+
+def trend = if sma50 > sma50[1] then yes else no;
+
+# Grab the lowest and the highest KMA
+def max = max(max(sma10, sma21),sma50);
+def min = min(min(sma10,sma21),sma50);
+
+def high_kma = max;
+def low_kma = min;
+def pinch_percent;
+def priceDist;
+
+# determine whether we will use high or low KMA to find the % distance to the price
+if open < low_kma {
+    priceDist = absValue((low_kma/open)-1);
+} else {
+    priceDist = absValue((high_kma/open)-1);
+}
+
+# get percent difference between high & low KMAs
+pinch_percent = (high_kma/low_kma)-1;
+
+# plot arrows for pinch spots in the past for review
+plot kmap_lp = if pinch_percent < userKMAP and priceDist < userPriceO and trend then yes else no;
+
+# get KMAP percent as a label in order to see the spread between high and low
+addlabel(1,
+         "KMAP Spread: " + asPercent(pinch_percent),
+         if pinch_percent < userKMAP then color.green
+         else if pinch_percent < userKMAP+0.005 then color.gray
+         else color.red
+);
+
+kmap_lp.SetDefaultColor(color.YELLOW);
+kmap_lp.SetPaintingStrategy(PaintingStrategy.BOOLEAN_Arrow_Down);
+kmap_lp.hideTitle();
