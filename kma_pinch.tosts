@@ -1,16 +1,23 @@
-#get user inputs, however, set basics for proper KMAP
+# authors: TraderLion member @diamond
 
-input KMAP_Percent = 2;
-input Price_Offset = 3.0;
+input kmap_percent = 2.0;
+input price_offset = 3.0;
+input enforce_upward_trend = yes;
 
-def userKMAP = KMAP_Percent/100;
-def userPriceO = Price_Offset/100;
+def kmap_fraction = kmap_percent/100;
+def price_offset_fraction = price_offset/100;
 
 def sma10 = Average(close, 10);
 def sma21 = Average(close, 21);
 def sma50 = Average(close, 50);
 
-def trend = if sma50 > sma50[1] then yes else no;
+def upward_trend;
+
+if enforce_upward_trend {
+    upward_trend = if sma50 > sma50[1] then yes else no;
+} else {
+    upward_trend = yes;
+}
 
 # Grab the lowest and the highest KMA
 def max = max(max(sma10, sma21),sma50);
@@ -19,26 +26,29 @@ def min = min(min(sma10,sma21),sma50);
 def high_kma = max;
 def low_kma = min;
 def pinch_percent;
-def priceDist;
+def distance_to_kma;
 
 # determine whether we will use high or low KMA to find the % distance to the price
 if open < low_kma {
-    priceDist = absValue((low_kma/open)-1);
+    distance_to_kma = absValue((low_kma/open)-1);
 } else {
-    priceDist = absValue((high_kma/open)-1);
+    distance_to_kma = absValue((high_kma/open)-1);
 }
 
 # get percent difference between high & low KMAs
 pinch_percent = (high_kma/low_kma)-1;
 
 # plot arrows for pinch spots in the past for review
-plot kmap_lp = if pinch_percent < userKMAP and priceDist < userPriceO and trend then yes else no;
+plot kmap_lp = if pinch_percent < kmap_fraction and
+                  distance_to_kma < price_offset_fraction and
+                  upward_trend then yes
+               else no;
 
 # get KMAP percent as a label in order to see the spread between high and low
 addlabel(1,
          "KMAP Spread: " + asPercent(pinch_percent),
-         if pinch_percent < userKMAP then color.green
-         else if pinch_percent < userKMAP+0.005 then color.gray
+         if pinch_percent < kmap_fraction then color.green
+         else if pinch_percent < kmap_fraction+0.005 then color.gray
          else color.red
 );
 
