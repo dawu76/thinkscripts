@@ -54,15 +54,3 @@ plot box_lower = if !isnan(llf_thresholded) or !isnan(hhf_thresholded) then llf_
 
 addcloud(box_upper, box_lower, color.gray, color.gray);
 
-# Plot the High and Low of the Box; Paint Cloud
-plot BoxHigh = if !isnan(expL) and !isnan(ExpH) then ExpH else double.nan;
-     boxhigh.setdefaultColor(color.dark_green);
-     BoxHigh.setpaintingStrategy(paintingStrategy.HORIZONTAL);
-     BoxHigh.SETHIDING(HideBoxLines);
-
-plot BoxLow = if !isnan(expL) and !isnan(ExpH) then ExpL else double.nan;
-     BoxLow.setpaintingStrategy(paintingStrategy.HORIZONTAL);
-     BoxLow.setdefaultColor(color.dark_red);
-     BoxLow.SETHIDING(HideBoxLines);
-
-addcloud(BoxHigh, BoxLow, color.gray, color.gray);
