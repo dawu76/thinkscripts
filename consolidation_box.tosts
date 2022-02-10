@@ -1,159 +1,68 @@
-# B3 Consolidation Box
+# Consolidation Box Barebones - with Grey Consolidation Box
+# tomsk
+# 11.23.2019
 #
-# Automates a box and shows the breakouts via price color with targets based on the box's range. 
-# In a system the gray balance line would be your stop, or you may exit on any trip back within the old box range. 
-# The color of the candles does not tell you when to be long or short, it simply tells you the last signal given. 
-# You must manage your trade targets via your own profit protection tactics. 
+# B3 Consolidation Box
+# Hammond B3
+# 2.2.2019
+#
+# minor changes to remove re-painting
+# 02.09.2022
 
-declare upper; 
+input window_length_backward = 5;
+input window_length_forward = 5;
 
-input BarsUsedForRange = 2; 
-input BarsRequiredToRemainInRange = 6;
-input TargetMultiple = 0.5; 
-input ColorPrice = yes; 
+# Identify Consolidation
+def highest_recent = highest(high[1], window_length_backward);
+def lowest_recent = lowest(low[1], window_length_backward);
 
-input HideTargets = no; 
-input HideBalance = no; 
-input HideBoxLines = no; 
-input HideCloud = no; 
-input HideLabels = no; 
+def highest_high = highest(highest_recent, window_length_forward);
+def lowest_low = lowest(lowest_recent, window_length_forward);
 
-# identify consolidation periods
+def hh_forward = if highest_high == highest_high[1] or lowest_low == lowest_low[1] then highest_high
+                 else hh_forward[1];
+def ll_forward = if highest_high == highest_high[1] or lowest_low == lowest_low[1] then lowest_low
+                 else ll_forward[1];
 
-# get low & high prices observed in `BarsUsedForRange` bars prior to current
-def highest_high = highest(high[1], BarsUsedForRange); 
-def lowest_low = lowest(low[1], BarsUsedForRange);
+def hhf_stable = if high <= hh_forward and hh_forward == hh_forward[1]
+                 then hh_forward else double.nan;
+def llf_stable = if low >= ll_forward and ll_forward == ll_forward[1]
+                 then ll_forward else double.nan;
 
-# get lowest low and highest high observed in the past `BarsRequiredToRemainInRange` bars
-def max_high = highest(highest_high, BarsRequiredToRemainInRange); 
-def min_low = lowest(lowest_low, BarsRequiredToRemainInRange);
+def count_hhf = if isnan(hhf_stable) or isnan(llf_stable) then 1
+                else count_hhf[1] + 1;
+def count_llf = if isnan(hhf_stable) or isnan(llf_stable) then 1
+                else count_llf[1] + 1;
 
-# update min low and max high only if those of prior period remain intact
-def max_high_forward = if min_low == min_low[1] and max_high == max_high[1] then max_high_forward[1]
-                       else max_high_forward; 
-def min_low_forward = if min_low == min_low[1] and max_high == max_high[1] then min_low_forward[1]
-                      else min_low_forward;
+def hhf_thresholded = if barnumber() == 1 then double.nan 
+    else if count_hhf >= window_length_forward then hhf_stable
+    else if high <= hhf_thresholded[1] then hhf_thresholded[1] 
+    else double.nan;
 
-plot max_high_viz = highest_high;
-plot min_low_viz = lowest_low;
-plot max_high_forward_viz = max_high_forward;
-plot min_low_forward_viz = min_low_forward;
+def llf_thresholded = if barnumber() == 1 then double.nan 
+    else if count_llf >= window_length_forward then llf_stable
+    else if low >= llf_thresholded[1] then llf_thresholded[1] else double.nan;
 
-max_high_viz.setDefaultColor(Color.blue);
-min_low_viz.setDefaultColor(Color.red);
+# Plot the High and Low of the Box; Paint Cloud
+plot box_upper = if !isnan(llf_thresholded) or !isnan(hhf_thresholded) then hhf_thresholded else double.nan;
+     box_upper.setpaintingStrategy(paintingStrategy.HORIZONTAL);
+     box_upper.setdefaultColor(color.dark_green);
 
-max_high_viz.setlineWeight(2);
-min_low_viz.setlineWeight(2);
+plot box_lower = if !isnan(llf_thresholded) or !isnan(hhf_thresholded) then llf_thresholded else double.nan;
+     box_lower.setpaintingStrategy(paintingStrategy.HORIZONTAL);
+     box_lower.setdefaultColor(color.dark_red);
 
-# if max high is unchanged and current high is less than it, carry forward max high
-def Bh = if high <= max_high_forward and max_high_forward == max_high_forward[1]
-         then max_high_forward else double.nan;
-# if min low is unchanged and currentRatio low is greater than it, carry forward min low
-def Bl = if low >= min_low_forward and min_low_forward == min_low_forward[1]
-         then min_low_forward else double.nan; 
+addcloud(box_upper, box_lower, color.gray, color.gray);
 
-def CountH = if isnan(Bh) or isnan(Bl) then 1 else CountH[1] + 1; 
-def CountL = if isnan(Bh) or isnan(Bl) then 1 else CountL[1] + 1; 
+# Plot the High and Low of the Box; Paint Cloud
+plot BoxHigh = if !isnan(expL) and !isnan(ExpH) then ExpH else double.nan;
+     boxhigh.setdefaultColor(color.dark_green);
+     BoxHigh.setpaintingStrategy(paintingStrategy.HORIZONTAL);
+     BoxHigh.SETHIDING(HideBoxLines);
 
-# def ExpH = if barnumber() == 1 then double.nan
-#            else if CountH[-BarsRequiredToRemainInRange] >= BarsRequiredToRemainInRange then max_high_forward[-BarsRequiredToRemainInRange]
-#            else if high <= ExpH[1] then ExpH[1] else double.nan; 
+plot BoxLow = if !isnan(expL) and !isnan(ExpH) then ExpL else double.nan;
+     BoxLow.setpaintingStrategy(paintingStrategy.HORIZONTAL);
+     BoxLow.setdefaultColor(color.dark_red);
+     BoxLow.SETHIDING(HideBoxLines);
 
-# def ExpL = if barnumber() == 1 then double.nan
-#            else if Countl[-BarsRequiredToRemainInRange] >= BarsRequiredToRemainInRange then min_low_forward[-BarsRequiredToRemainInRange]
-#            else if Low >= ExpL[1] then ExpL[1] else double.nan; 
-
-def ExpH = if barnumber() == 1 then double.nan
-           else if CountH >= BarsRequiredToRemainInRange then max_high_forward
-           else if high <= ExpH[1] then ExpH[1] else double.nan; 
-
-def ExpL = if barnumber() == 1 then double.nan
-           else if Countl >= BarsRequiredToRemainInRange then min_low_forward
-           else if Low >= ExpL[1] then ExpL[1] else double.nan;
-
-# Plot the High and Low of the Box; Paint Cloud 
-plot BoxHigh = if !isnan(expL) and !isnan(ExpH) then ExpH else double.nan; 
-plot BoxLow = if !isnan(expL) and !isnan(ExpH) then ExpL else double.nan; 
-
-BoxHigh.setdefaultColor(color.dark_green);
-BoxLow.setdefaultColor(color.dark_red);
-
-BoxHigh.setpaintingStrategy(paintingStrategy.HORIZONTAL); 
-BoxLow.setpaintingStrategy(paintingStrategy.HORIZONTAL); 
-
-BoxHigh.SETHIDING(HideBoxLines); 
-BoxLow.SETHIDING(HideBoxLines); 
-
-addcloud(if !HideCloud then BoxHigh else double.nan, BoxLow, color.gray, color.gray); 
-
-# Things to the Right of a Finished Box 
-
-def eH = if barnumber() == 1 then double.nan else if !isnan(BoxHigh[1]) and isnan(BoxHigh) then BoxHigh[1] else eh[1]; 
-def eL = if barnumber() == 1 then double.nan else if !isnan(BoxLow[1]) and isnan(BoxLow) then BoxLow[1] else el[1]; 
-def diff = (eh - el) * TargetMultiple; 
-
-plot Balance = if isnan(boxhigh) and isnan(boxlow) then (eh+el)/2 else double.nan;
-
-plot Htgt_1 = if isnan(Boxhigh) and high >= eh then eh + diff else double.nan;
-plot Htgt_2 = if isnan(Boxhigh) and high >= eh then eh + diff*2 else double.nan;
-plot Htgt_3 = if isnan(Boxhigh) and high >= eh then eh + diff*3 else double.nan;
-
-plot Ltgt_1 = if isnan(BoxLow) and Low <= eL then eL - diff else double.nan; 
-plot Ltgt_2 = if isnan(BoxLow) and Low <= eL then eL - diff*2 else double.nan;
-plot Ltgt_3 = if isnan(BoxLow) and Low <= eL then eL - diff*3 else double.nan;
-
-Balance.SETHIDING(HideBalance); 
-
-Balance.setdefaultColor(CREATECOLOR(255,255,255)); 
-Balance.setpaintingStrategy(PAIntingStrategy.SQUARES); 
-
-Htgt_1.setlineWeight(2); 
-Htgt_2.setlineWeight(2); 
-Htgt_3.setlineWeight(2); 
-
-Ltgt_1.setlineWeight(2); 
-Ltgt_2.setlineWeight(2); 
-Ltgt_3.setlineWeight(2); 
-
-Htgt_1.setdefaultColor(CREATECOLOR( 50, 100 , 75)); 
-Htgt_1.setpaintingStrategy(PAIntingStrategy.DASHES); 
-Htgt_2.setdefaultColor(CREATECOLOR( 50, 100 , 75)); 
-Htgt_2.setpaintingStrategy(paintingStrategy.HORIZONTAL); 
-Htgt_3.setdefaultColor(CREATECOLOR( 50, 100 , 75)); 
-Htgt_3.setpaintingStrategy(PAIntingStrategy.DASHES); 
-
-Ltgt_1.setdefaultColor(CREATECOLOR( 100, 50 , 75)); 
-Ltgt_1.setpaintingStrategy(PAIntingStrategy.DASHES); 
-Ltgt_2.setdefaultColor(CREATECOLOR( 100, 50 , 75)); 
-Ltgt_2.setpaintingStrategy(paintingStrategy.HORIZONTAL); 
-Ltgt_3.setdefaultColor(CREATECOLOR( 100, 50 , 75)); 
-Ltgt_3.setpaintingStrategy(PAIntingStrategy.DASHES); 
-
-Htgt_1.SETHIDING(HIDETARGETS); 
-Htgt_2.SETHIDING(HIDETARGETS); 
-Htgt_3.SETHIDING(HIDETARGETS); 
-
-Ltgt_1.SETHIDING(HIDETARGETS); 
-Ltgt_2.SETHIDING(HIDETARGETS); 
-Ltgt_3.SETHIDING(HIDETARGETS);
-
-# Labels 
-
-addlabel(
-    !HideLabels,
-    "TgtLvls = " + diff + "pts each | Bal = " + balance,
-    if high > eh  and low < el then color.yellow
-    else if high > eh then color.green
-    else if low < el then color.red
-    else color.gray
-); 
-
-addlabel(!HideLabels && high > eh && low < el, "OUTSIDE BAR!!", color.yellow); 
-addlabel(!HideLabels && high > eh && low >= el, "Long", color.green); 
-addlabel(!HideLabels && high <= eh && low < el, "Short", color.red); 
-
-# Price Color
-assignPriceColor(if !ColorPrice then color.current else if !isnan(BoxHigh) then color.gray
-                 else if high > eh  and low < el then color.yellow
-                 else if high > eh then color.green else if low < el then color.red
-                 else color.gray);
+addcloud(BoxHigh, BoxLow, color.gray, color.gray);
